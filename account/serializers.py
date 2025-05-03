@@ -6,7 +6,7 @@ from rest_framework import serializers
 class CustomUserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'first_name', 'last_name']
+        fields = ['email', 'first_name', 'last_name']
         extra_kwargs = {
             'email': {'required': True, 'allow_blank': False, 'read_only': True},
         }
@@ -15,7 +15,7 @@ class CustomUserProfileSerializer(serializers.ModelSerializer):
 class CustomUserRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'first_name', 'last_name', 'password']
+        fields = ['email', 'first_name', 'last_name', 'password']
         extra_kwargs = {
             'email': {'required': True, 'allow_blank': False},
             'password': {'write_only': True, 'min_length': 5, 'max_length': 128}

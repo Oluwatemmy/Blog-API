@@ -2,7 +2,7 @@
 from .serializers import PostSerializer
 from .models import Post
 from account.models import CustomUser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework import status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -80,6 +80,54 @@ class ViewAPostView(ListAPIView):
             )
 
 
+class UpdatePostView(UpdateAPIView):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        post = get_object_or_404(Post, id=pk)
+        # Check if the user is the author of the post
+        if post.user != request.user:
+            return Response(
+                {"message": "You do not have permission to edit this post."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = self.serializer_class(post, data=request.data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            return Response(
+                {
+                    "post": serializer.data,
+                    "message": "Post updated successfully",
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+
+class DeletePostView(DestroyAPIView):
+    queryset = Post.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def delete(self, request, pk):
+        post = get_object_or_404(Post, id=pk)
+        # Check if the user is the author of the post
+        if post.user != request.user and not request.user.is_superuser:
+            # If the user is not the author and not a superuser, deny permission
+            return Response(
+                {"message": "You do not have permission to delete this post."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        try:
+            post.delete()
+            return Response(
+                {"message": "Post deleted successfully"}, status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"error": "An error occurred while deleting the post"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 

@@ -10,8 +10,6 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 
-
-
 # Create your views here.
 class CustomUserRegisterView(GenericAPIView):
     serializer_class = CustomUserRegisterSerializer
@@ -20,8 +18,6 @@ class CustomUserRegisterView(GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid(raise_exception=True):
             user = serializer.save()
-            user.is_staff = True
-            user.save()
             return Response(
                     {
                         "message": "User created successfully!!!",
