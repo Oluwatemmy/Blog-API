@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.generics import (
     CreateAPIView,
     ListAPIView,
@@ -43,13 +44,20 @@ class ListPostView(ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
     pagination_class = CustomPagination
+    filterset_fields = ['is_published', 'title']
 
     def get(self, request):
         # Get the user from the request
         user = CustomUser.objects.get(id=request.user.id)
         # Get all posts by the user
         posts = Post.objects.filter(user=user)
+
+        # Apply filters
+        for backend in list(self.filter_backends):
+            posts = backend().filter_queryset(request, posts, self)
+
         paginator = self.pagination_class()
         # Paginate the posts
         page = paginator.paginate_queryset(posts, request)
