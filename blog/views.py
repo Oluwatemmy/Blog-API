@@ -7,6 +7,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
 from rest_framework.generics import (
     CreateAPIView,
     ListAPIView,
@@ -44,9 +45,10 @@ class ListPostView(ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     pagination_class = CustomPagination
     filterset_fields = ['is_published', 'title']
+    ordering_fields = ['created_at', 'updated_at', 'id']
 
     def get(self, request):
         # Get the user from the request
@@ -178,11 +180,17 @@ class CreateCommentView(CreateAPIView):
 class ListCommentView(ListAPIView):
     serializer_class = CommentSerializer
     pagination_class = CustomPagination
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['user']
+    ordering_fields = ['created_at', 'updated_at', 'id']
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         post = get_object_or_404(Post, id=pk)
         comments = Comment.objects.filter(post=post)
+        # Apply filters
+        for backend in list(self.filter_backends):
+            comments = backend().filter_queryset(request, comments, self)
         paginator = self.pagination_class()
         # Paginate the comments
         page = paginator.paginate_queryset(comments, request)
