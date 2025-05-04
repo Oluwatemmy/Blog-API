@@ -1,8 +1,8 @@
-
-from .serializers import PostSerializer, CommentSerializer
 from .models import Post, Comment
+from .serializers import PostSerializer, CommentSerializer
+from .paginator import CustomPagination
 from account.models import CustomUser
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -37,27 +37,28 @@ class CreatepostView(CreateAPIView):
             return Response(
                 {"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+
 class ListPostView(ListAPIView):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
 
     def get(self, request):
         # Get the user from the request
         user = CustomUser.objects.get(id=request.user.id)
         # Get all posts by the user
         posts = Post.objects.filter(user=user)
+        paginator = self.pagination_class()
+        # Paginate the posts
+        page = paginator.paginate_queryset(posts, request)
         # Return the posts in the response
-        serializer = self.serializer_class(posts, many=True)
-        return Response(
-            {
-                "posts": serializer.data,
-                "message": f"Posts retrieved successfully for {user.first_name}",
-            },
-            status=status.HTTP_200_OK,
+        serializer = self.serializer_class(page, many=True)
+        return paginator.get_paginated_response(
+            serializer.data
         )
-    
+
 
 class ViewAPostView(ListAPIView):
     queryset = Post.objects.all()
@@ -104,7 +105,7 @@ class UpdatePostView(UpdateAPIView):
                 status=status.HTTP_200_OK,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 class DeletePostView(DestroyAPIView):
     queryset = Post.objects.all()
@@ -164,24 +165,25 @@ class CreateCommentView(CreateAPIView):
             return Response(
                 {"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
             )
-        
+
 
 class ListCommentView(ListAPIView):
     serializer_class = CommentSerializer
+    pagination_class = CustomPagination
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
         post = get_object_or_404(Post, id=pk)
         comments = Comment.objects.filter(post=post)
-        serializer = self.serializer_class(comments, many=True)
-        return Response(
-            {
-                "comments": serializer.data,
-                "message": f"Comments retrieved successfully for {post.title}",
-            },
-            status=status.HTTP_200_OK,
+        paginator = self.pagination_class()
+        # Paginate the comments
+        page = paginator.paginate_queryset(comments, request)
+        serializer = self.serializer_class(page, many=True)
+        return paginator.get_paginated_response(
+            serializer.data
         )
-    
+
+
 class UpdateCommentView(UpdateAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
@@ -221,7 +223,7 @@ class UpdateCommentView(UpdateAPIView):
             "comment": serializer.data,
             "message": "Comment updated successfully"
         }, status=status.HTTP_200_OK)
-    
+
 
 class DeleteCommentView(DestroyAPIView):
     queryset = Comment.objects.all()

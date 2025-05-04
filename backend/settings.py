@@ -60,6 +60,8 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'blog.paginator.CustomPagination',
+    'PAGE_SIZE': 5,  # You can change this to any number
 }
 
 ROOT_URLCONF = 'backend.urls'
