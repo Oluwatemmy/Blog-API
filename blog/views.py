@@ -1,6 +1,6 @@
 
-from .serializers import PostSerializer
-from .models import Post
+from .serializers import PostSerializer, CommentSerializer
+from .models import Post, Comment
 from account.models import CustomUser
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework import status
@@ -108,7 +108,7 @@ class UpdatePostView(UpdateAPIView):
 
 class DeletePostView(DestroyAPIView):
     queryset = Post.objects.all()
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
         post = get_object_or_404(Post, id=pk)
@@ -130,4 +130,121 @@ class DeletePostView(DestroyAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+class CreateCommentView(CreateAPIView):
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        serializer = self.serializer_class(data=request.data)
+        # Check if the post exists
+        try:
+            post = Post.objects.get(id=pk)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        # Check if the post is published
+        if not post.is_published:
+            return Response(
+                {"error": "Post is not published"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if serializer.is_valid(raise_exception=True):
+            # Check if the user is authenticated
+            if not request.user.is_authenticated:
+                return Response({"error": "User is not authenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Save the comment with the author and post
+            serializer.save(user=request.user, post=post)
+            return Response({
+                "comment": serializer.data,
+                "message": f"Comment added successfully by {request.user.first_name} {request.user.last_name}",
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(
+                {"error": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
+            )
+        
+
+class ListCommentView(ListAPIView):
+    serializer_class = CommentSerializer
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        post = get_object_or_404(Post, id=pk)
+        comments = Comment.objects.filter(post=post)
+        serializer = self.serializer_class(comments, many=True)
+        return Response(
+            {
+                "comments": serializer.data,
+                "message": f"Comments retrieved successfully for {post.title}",
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+class UpdateCommentView(UpdateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, pk):
+        try:
+            comment = Comment.objects.get(id=pk)
+        except Comment.DoesNotExist:
+            return Response(
+                {"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        # Check if the user is the author of the comment
+        if comment.user != request.user:
+            return Response(
+                {"message": "You do not have permission to edit this comment."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # Check if the post exists
+        try:
+            post = Post.objects.get(id=comment.post.id)
+        except Post.DoesNotExist:
+            return Response(
+                {"error": "Post not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = self.serializer_class(comment, data=request.data, partial=True)
+
+        if not serializer.is_valid():
+            return Response(
+                {"errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Update the comment
+        serializer.save()
+        return Response({
+            "comment": serializer.data,
+            "message": "Comment updated successfully"
+        }, status=status.HTTP_200_OK)
+    
+
+class DeleteCommentView(DestroyAPIView):
+    queryset = Comment.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        try:
+            comment = Comment.objects.get(id=pk)
+        except Comment.DoesNotExist:
+            return Response(
+                {"error": "Comment not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if comment.user != request.user and not request.user.is_staff and not request.user.is_superuser:
+            # If the user is not the author and not a superuser, deny permission
+            return Response(
+                {"message": "You do not have permission to delete this comment."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        # delete the comment
+        comment.delete()
+        return Response(
+            {"message": "Comment deleted successfully."},
+            status=status.HTTP_200_OK
+        )
 
